@@ -1,0 +1,524 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<hdevelop file_version="1.2" halcon_version="18.11.2.0">
+<procedure name="main">
+<interface/>
+<body>
+<c></c>
+<l>dev_update_window ('off')</l>
+<c></c>
+<l>open_framegrabber ('GenICamTL', 0, 0, 0, 0, 0, 0, 'progressive', 16, 'rgb', -1, 'false', 'default', '127.0.0.1', 0, -1, AcqHandle)</l>
+<c></c>
+<l>get_framegrabber_param (AcqHandle, 'image_width', Width)</l>
+<l>get_framegrabber_param (AcqHandle, 'image_height', Height)</l>
+<l>get_framegrabber_param (AcqHandle, 'grab_timeout', timeout)</l>
+<l>DisplayHeight := 600</l>
+<l>DisplayWidth := DisplayHeight * Width / Height</l>
+<c>* </c>
+<l>while (true)</l>
+<l>    * display_waiting_message ()</l>
+<l>    ObjectArray := []</l>
+<l>    Points_3D_side_array := []</l>
+<l>    Points_3D_side := []</l>
+<l>    pointsNumber := 20</l>
+<l>    RowInteract_side1 := []</l>
+<l>    ColumnInteract_side1 := []</l>
+<l>    X_points_side1 := []</l>
+<l>    Y_points_side1 := []</l>
+<l>    Z_points_side1 := []</l>
+<l>    Points_3D_side1 := []</l>
+<c>    </c>
+<l>    RowInteract_side2 := []</l>
+<l>    ColumnInteract_side2 := []</l>
+<l>    X_points_side2 := []</l>
+<l>    Y_points_side2 := []</l>
+<l>    Z_points_side2 := []</l>
+<l>    Points_3D_side2 := []</l>
+<c>    </c>
+<l>    pointsNumberSide1 := pointsNumber/2</l>
+<l>    pointsNumberSide2 := pointsNumber/2</l>
+<c>    </c>
+<l>    radius := 0.007</l>
+<l>    button := 1</l>
+<l>    refSysSearch := false</l>
+<c>    </c>
+<l>    posRefX := 0</l>
+<l>    posRefY := 0</l>
+<l>    posRefZ := 0</l>
+<l>    agleRefX := 0</l>
+<l>    angleRefY := 0</l>
+<l>    angleRefZ := 0</l>
+<c>    </c>
+<l>    RefSys := []</l>
+<c>    </c>
+<l>    for j := 0 to 1 by 1  </l>
+<l>            try</l>
+<l>                grab_image (Image, AcqHandle)</l>
+<l>            catch (Exception)</l>
+<l>                continue</l>
+<l>            endtry</l>
+<c>            </c>
+<l>            dev_close_window ()</l>
+<l>            dev_open_window (0, 0, DisplayWidth, DisplayHeight, 'black', WindowID1)</l>
+<l>            dev_open_window (0, DisplayWidth + 5, DisplayWidth, DisplayHeight, 'black', WindowID2)</l>
+<c>            </c>
+<l>            Go2GenTL_ParseData (Image, HeightMap, Intensity, frameCount, timestamp, encoderPosition, encoderIndex, inputs, xOffset, xResolution, yOffset, yResolution, zOffset, zResolution, width, height, HasIntensity)</l>
+<c>            </c>
+<l>            scale_image (Intensity, IntensityScaled, 1.0 / 256, 0)</l>
+<c>          </c>
+<l>            gen_image_surface_first_order (X, 'real', 0, xResolution * 1e-9, xOffset * 1e-9, 0, 0, Width, Height)</l>
+<l>            gen_image_surface_first_order (Y, 'real', yResolution * 1e-9, 0, yOffset * 1e-9, 0, 0, Width, Height)</l>
+<c>            </c>
+<l>            threshold (HeightMap, Region, 1, lsh(1,16) - 1)</l>
+<l>            reduce_domain (HeightMap, Region, ImageReduced)</l>
+<l>            convert_image_type (ImageReduced, Z, 'real')</l>
+<l>            Go2GenTL_Transformation (AcqHandle, xOffsetTransform, zOffsetTransform, AngleTransform, OrientationTransform, StandOff)</l>
+<c>            </c>
+<l>            if (zOffsetTransform &gt; lsh(1,31))</l>
+<l>                zOffsetTransform_signed := zOffsetTransform - lsh(1,32)</l>
+<l>            else</l>
+<l>                zOffsetTransform_signed := zOffsetTransform</l>
+<l>            endif</l>
+<l>            scale_image (Z, Z, zResolution * -1e-9, (StandOff + zOffsetTransform_signed) * 1e-6 - zOffset * 1e-9)</l>
+<c>            </c>
+<l>            xyz_to_object_model_3d (X, Y, Z, ObjectModel3D)</l>
+<c>          </c>
+<l>           if(refSysSearch)</l>
+<l>                dev_set_window (WindowID2)</l>
+<l>                dev_display (Z)</l>
+<l>                get_mbutton (WindowID2, RowStartROI, ColStartROI, Button)</l>
+<l>                get_mbutton (WindowID2, RowEndROI, ColEndROI, Button)</l>
+<l>                gen_rectangle1 (ROI_0, RowStartROI, ColStartROI, RowEndROI, ColEndROI)</l>
+<l>                reduce_domain (X, ROI_0, X_RefSysRegion)</l>
+<l>                reduce_domain (Y, ROI_0, Y_RefSysRegion)</l>
+<l>                reduce_domain (Z, ROI_0, Z_RefSysRegion)</l>
+<l>                xyz_to_object_model_3d (X_RefSysRegion, Y_RefSysRegion, Z_RefSysRegion, RefSysRegionModel3D)</l>
+<c>                </c>
+<l>                threshold (Z_RefSysRegion, RegThresh, 0, 10)</l>
+<c>                </c>
+<l>                gen_contour_region_xld (RegThresh, Contours, 'border')</l>
+<l>                get_contour_xld(Contours, Row, Col)</l>
+<l>                tuple_max(Row, RowMax)</l>
+<l>                tuple_find_first(Row, RowMax, Index)</l>
+<l>                tuple_select (Col, Index, ColMax)</l>
+<c>                </c>
+<l>                get_grayval(X_RefSysRegion, RowMax, ColMax, X_ref)</l>
+<l>                get_grayval(Y_RefSysRegion, RowMax, ColMax, Y_ref)</l>
+<l>                get_grayval(Z_RefSysRegion, RowMax, ColMax, Z_ref)</l>
+<l>                gen_sphere_object_model_3d_center (X_ref, Y_ref, Z_ref, radius, Points_3D_ref)</l>
+<c>                </c>
+<l>                get_object_model_3d_params (Points_3D_ref, 'center', RefCenter)</l>
+<l>                posRefX := -RefCenter[0]</l>
+<l>                posRefY := -RefCenter[1]</l>
+<l>                posRefZ := -RefCenter[2]</l>
+<l>                angleRefX := -0</l>
+<l>                angleRefY := -36.7</l>
+<l>                angleRefZ := -90</l>
+<l>                RefSys := [posRefX, posRefY, posRefZ, angleRefX, angleRefY, angleRefZ]</l>
+<c>                </c>
+<l>                write_tuple (RefSys,'C:/Users/l.coviello/Desktop/RefSysParameters.tup')</l>
+<c>                </c>
+<l>                get_object_model_3d_params (Points_3D_ref, 'center', RefCenter)</l>
+<l>                create_pose (-RefCenter[0], -RefCenter[1], -RefCenter[2], 0, 0, 0, 'Rp+T', 'gba', 'point', PoseRef1)</l>
+<l>                create_pose (0, 0, 0, 0, -36, 0, 'Rp+T', 'gba', 'point', PoseRef2)</l>
+<l>                create_pose (0, 0, 0, 0, 0, -90, 'Rp+T', 'gba', 'point', PoseRef3)</l>
+<l>                pose_to_hom_mat3d (PoseRef1, HomMat3DRef1)            </l>
+<l>                pose_to_hom_mat3d (PoseRef2, HomMat3DRef2)</l>
+<l>                pose_to_hom_mat3d (PoseRef3, HomMat3DRef3)</l>
+<l>                affine_trans_object_model_3d(ObjectModel3D, HomMat3DRef1, ObjectModel3D)</l>
+<l>                affine_trans_object_model_3d(ObjectModel3D, HomMat3DRef2, ObjectModel3D)</l>
+<l>                affine_trans_object_model_3d(ObjectModel3D, HomMat3DRef3, ObjectModel3D)</l>
+<c>              </c>
+<l>                dev_open_window (0, 800, 800, 800, 'black', Window3D)</l>
+<l>                dev_set_window (Window3D)</l>
+<l>                VisPose := []</l>
+<l>                Instructions[0] := 'Rotate: Left button'</l>
+<l>                Instructions[1] := 'Zoom:   Shift + left button'</l>
+<l>                Instructions[2] := 'Move:   Ctrl  + left button'</l>
+<l>                visualize_object_model_3d (Window3D, [Points_3D_ref ,ObjectModel3D], [], VisPose, ['color_attrib','lut','disp_pose'], ['coord_z','rainbow','true'], 'ObjectModel3D', [], Instructions, PoseOut)</l>
+<l>                break</l>
+<l>            endif</l>
+<c>            </c>
+<l>            dev_close_window ()</l>
+<l>            dev_close_window ()</l>
+<c>            </c>
+<l>            if(j=0)</l>
+<l>                copy_image (X, X1)</l>
+<l>                copy_image (Y, Y1)</l>
+<l>                copy_image (Z, Z1)</l>
+<l>                copy_image (IntensityScaled, IntensityScaled1)</l>
+<c>                </c>
+<l>                get_region_points (Z, RowZ1, ColumnsZ1)</l>
+<l>                get_grayval (IntensityScaled1, RowZ1, ColumnsZ1, Grayval1)</l>
+<l>                set_object_model_3d_attrib_mod (ObjectModel3D, '&amp;intensity1', 'points', Grayval1)</l>
+<c>            </c>
+<l>            else</l>
+<l>                copy_image (X, X2)</l>
+<l>                copy_image (Y, Y2)</l>
+<l>                copy_image (Z, Z2)</l>
+<l>                copy_image (IntensityScaled, IntensityScaled2)</l>
+<c>                </c>
+<l>                get_region_points (Z, RowZ2, ColumnsZ2)</l>
+<l>                get_grayval (IntensityScaled2, RowZ2, ColumnsZ2, Grayval2)</l>
+<l>                set_object_model_3d_attrib_mod (ObjectModel3D, '&amp;intensity2', 'points', Grayval2)</l>
+<l>            endif</l>
+<c>                       </c>
+<l>            read_tuple ('C:/Users/l.coviello/Desktop/RefSysParameters.tup', ReferSystem)</l>
+<c>            </c>
+<c>            **get_object_model_3d_params (ObjectModel3D, 'center', ObjCenter)</c>
+<l>            create_pose (ReferSystem[0], ReferSystem[1], ReferSystem[2], 0, 0, 0, 'Rp+T', 'gba', 'point', PoseRef1)           </l>
+<l>            create_pose (0, 0, 0, 0, ReferSystem[4], 0, 'Rp+T', 'gba', 'point', PoseRef2)</l>
+<l>            create_pose (0, 0, 0, 0, 0, ReferSystem[5], 'Rp+T', 'gba', 'point', PoseRef3)</l>
+<l>            pose_to_hom_mat3d (PoseRef1, HomMat3DRef1)            </l>
+<l>            pose_to_hom_mat3d (PoseRef2, HomMat3DRef2)</l>
+<l>            pose_to_hom_mat3d (PoseRef3, HomMat3DRef3)</l>
+<l>            affine_trans_object_model_3d(ObjectModel3D, HomMat3DRef1, ObjectModel3D)</l>
+<l>            affine_trans_object_model_3d(ObjectModel3D, HomMat3DRef2, ObjectModel3D)</l>
+<l>            affine_trans_object_model_3d(ObjectModel3D, HomMat3DRef3, ObjectModel3D)</l>
+<c>            </c>
+<l>            dev_open_window (0, 800, 800, 800, 'black', Window3D)</l>
+<l>            dev_set_window (Window3D)</l>
+<l>            VisPose := []</l>
+<l>            Instructions[0] := 'Rotate: Left button'</l>
+<l>            Instructions[1] := 'Zoom:   Shift + left button'</l>
+<l>            Instructions[2] := 'Move:   Ctrl  + left button'</l>
+<l>            visualize_object_model_3d (Window3D, ObjectModel3D, [], VisPose, ['color_attrib','lut','disp_pose'], ['coord_z','rainbow','true'], 'ObjectModel3D', [], Instructions, PoseOut)</l>
+<c>            </c>
+<c>            </c>
+<l>            if (j=1)</l>
+<l>                create_pose (0, 0, 0, 0, 0, 180, 'Rp+T', 'gba', 'point', PoseMatch1)</l>
+<l>                create_pose (-0.292, 0, 0, 0, 0, 0, 'Rp+T', 'gba', 'point', PoseMatch2)</l>
+<l>                create_pose (0, -0.01, 0, 0, 0, 0, 'Rp+T', 'gba', 'point', PoseMatch3)</l>
+<l>                pose_to_hom_mat3d (PoseMatch1, HomMat3DMatch1)</l>
+<l>                pose_to_hom_mat3d (PoseMatch2, HomMat3DMatch2)</l>
+<l>                pose_to_hom_mat3d (PoseMatch3, HomMat3DMatch3)</l>
+<l>                affine_trans_object_model_3d(ObjectModel3D, HomMat3DMatch1, ObjectModel3D)</l>
+<l>                affine_trans_object_model_3d(ObjectModel3D, HomMat3DMatch2, ObjectModel3D)</l>
+<l>                affine_trans_object_model_3d(ObjectModel3D, HomMat3DMatch3, ObjectModel3D)</l>
+<l>            endif</l>
+<c>            </c>
+<l>            ObjectArray := [ObjectArray, ObjectModel3D]</l>
+<l>    endfor       </l>
+<c>            </c>
+<l>            dev_open_window (0, 800, 800, 800, 'black', Window3D)</l>
+<l>            dev_set_window (Window3D)</l>
+<l>            VisPose := []</l>
+<l>            Instructions[0] := 'Rotate: Left button'</l>
+<l>            Instructions[1] := 'Zoom:   Shift + left button'</l>
+<l>            Instructions[2] := 'Move:   Ctrl  + left button'</l>
+<l>            visualize_object_model_3d (Window3D, ObjectArray, [], VisPose, ['color_attrib','lut','disp_pose'], ['coord_z','rainbow','true'], 'ObjectModel3D', [], Instructions, PoseOut)</l>
+<c>    </c>
+<l>            object_model_3d_to_xyz (X_trans_side1, Y_trans_side1, Z_trans_side1, ObjectArray[0], 'from_xyz_map', VisPose, VisPose)</l>
+<l>            object_model_3d_to_xyz (X_trans_side2, Y_trans_side2, Z_trans_side2, ObjectArray[1], 'from_xyz_map', VisPose, VisPose)</l>
+<c>            </c>
+<l>            dev_open_window (0, 0, DisplayWidth, DisplayHeight, 'black', WindowInteract_side1)</l>
+<l>            dev_set_window (WindowInteract_side1)</l>
+<l>            dev_display (IntensityScaled1)</l>
+<l>            for w := 0 to pointsNumberSide1-1 by 1</l>
+<l>                    get_mbutton (WindowInteract_side1, RowInt, ColumnInt, Button)</l>
+<l>                    get_grayval(X_trans_side1, RowInt, ColumnInt, X_points_tmp)</l>
+<l>                    get_grayval(Y_trans_side1, RowInt, ColumnInt, Y_points_tmp)</l>
+<l>                    get_grayval(Z_trans_side1, RowInt, ColumnInt, Z_points_tmp)</l>
+<l>                    gen_sphere_object_model_3d_center (X_points_tmp, Y_points_tmp, Z_points_tmp, radius, Points_3D_tmp)</l>
+<l>                    get_object_model_3d_params (Points_3D_tmp, 'center', ObjCenter)</l>
+<l>                    create_pose (0, 0, -ObjCenter[2], 0, 0, 0, 'Rp+T', 'gba', 'point', Pose_2bis)</l>
+<l>                    pose_to_hom_mat3d (Pose_2bis, HomMat3D2bis)</l>
+<l>                    affine_trans_object_model_3d(Points_3D_tmp, HomMat3D2bis, Points_3D_tmp)</l>
+<c>                    </c>
+<l>                    RowInteract_side1 := [RowInteract_side1, RowInt]</l>
+<l>                    ColumnInteract_side1 := [ColumnInteract_side1, ColumnInt]</l>
+<l>                    X_points_side1 := [X_points_side1, X_points_tmp]</l>
+<l>                    Y_points_side1 := [Y_points_side1, Y_points_tmp]</l>
+<l>                    Z_points_side1 := [Z_points_side1, Z_points_tmp]</l>
+<l>                    Points_3D_side := [Points_3D_side ,Points_3D_tmp]</l>
+<l>             endfor</l>
+<c>             </c>
+<l>             dev_set_window (WindowInteract_side1)</l>
+<l>             dev_display (IntensityScaled2)</l>
+<l>             for w := 0 to pointsNumberSide2-1 by 1</l>
+<l>                    get_mbutton (WindowInteract_side1, RowInt, ColumnInt, Button)</l>
+<l>                    get_grayval(X_trans_side2, RowInt, ColumnInt, X_points_tmp)</l>
+<l>                    get_grayval(Y_trans_side2, RowInt, ColumnInt, Y_points_tmp)</l>
+<l>                    get_grayval(Z_trans_side2, RowInt, ColumnInt, Z_points_tmp)</l>
+<l>                    gen_sphere_object_model_3d_center (X_points_tmp, Y_points_tmp, Z_points_tmp, radius, Points_3D_tmp)</l>
+<l>                    get_object_model_3d_params (Points_3D_tmp, 'center', ObjCenter)</l>
+<l>                    create_pose (0, 0, -ObjCenter[2], 0, 0, 0, 'Rp+T', 'gba', 'point', Pose_2bis)</l>
+<l>                    pose_to_hom_mat3d (Pose_2bis, HomMat3D2bis)</l>
+<l>                    affine_trans_object_model_3d(Points_3D_tmp, HomMat3D2bis, Points_3D_tmp)</l>
+<c>                    </c>
+<l>                    RowInteract_side2 := [RowInteract_side2, RowInt]</l>
+<l>                    ColumnInteract_side2 := [ColumnInteract_side2, ColumnInt]</l>
+<l>                    X_points_side2 := [X_points_side2, X_points_tmp]</l>
+<l>                    Y_points_side2 := [Y_points_side2, Y_points_tmp]</l>
+<l>                    Z_points_side2 := [Z_points_side2, Z_points_tmp]</l>
+<l>                    Points_3D_side := [Points_3D_side, Points_3D_tmp]</l>
+<l>             endfor</l>
+<c>            </c>
+<l>            dev_open_window (0, 800, 800, 800, 'black', Window3D_1)</l>
+<l>            dev_set_window (Window3D_1)</l>
+<l>            VisPose := []</l>
+<l>            Instructions[0] := 'Rotate: Left button'</l>
+<l>            Instructions[1] := 'Zoom:   Shift + left button'</l>
+<l>            Instructions[2] := 'Move:   Ctrl  + left button'</l>
+<l>            visualize_object_model_3d (Window3D_1, [ObjectArray, Points_3D_side], [], VisPose, ['color_attrib','lut','disp_pose'], ['coord_z','rainbow','true'], 'ObjectModel3D', [], Instructions, PoseOut)</l>
+<c>    </c>
+<c>            </c>
+<l>            union_object_model_3d (ObjectArray, 'points_surface', UnionObjectModel3D)</l>
+<c>            </c>
+<l>            add_image (X1, X2, Xbis, 0.5, 0)</l>
+<l>            add_image (Y1, Y2, Ybis, 0.5, 0)</l>
+<l>            add_image (Z1, Z2, Zbis, 0.5, 0)</l>
+<l>            add_image (IntensityScaled1, IntensityScaled2, IntensityScaledbis, 255, 0)</l>
+<c>            </c>
+<l>            dev_open_window (0, 0, 800, 600, 'black', WindowID1)</l>
+<l>            set_display_font (WindowID1, 16, 'mono', 'true', 'false')</l>
+<l>            get_object_model_3d_params (ObjectModel3D, 'num_points', NumPoints)</l>
+<l>            if (NumPoints &gt; 0)</l>
+<l>                VisPose := []</l>
+<l>                Instructions[0] := 'Rotate: Left button'</l>
+<l>                Instructions[1] := 'Zoom:   Shift + left button'</l>
+<l>                Instructions[2] := 'Move:   Ctrl  + left button'</l>
+<l>                visualize_object_model_3d (WindowID1, ObjectArray, [], VisPose, ['color_attrib','lut','disp_pose'], ['coord_z','rainbow','true'], 'ObjectModel3D', [], Instructions, PoseOut)</l>
+<c>                * </c>
+<c>                * Visualize using the intensity data NOT WORKS ADDING THE 2 IMAGE</c>
+<l>*                 if (HasIntensity)</l>
+<l>*                     get_region_points (Zbis, Rows, Columns)</l>
+<l>*                     get_grayval (IntensityScaledbis, Rows, Columns, Grayval)</l>
+<l>*                     set_object_model_3d_attrib_mod (UnionObjectModel3D, '&amp;intensity', 'points', Grayval)</l>
+<l>*                     visualize_object_model_3d (WindowID1, UnionObjectModel3D, [], VisPose, ['color_attrib','lut','disp_pose'], ['&amp;intensity','sqrt','true'], 'ObjectModel3D with Amplitude', [], Instructions, PoseOut)</l>
+<l>*                 endif</l>
+<l>            else</l>
+<l>                disp_message (WindowID1, 'No 3D points in the 3D object model!', 'window', 250, 200, 'black', 'true')</l>
+<l>                stop ()</l>
+<l>            endif</l>
+<l>endwhile</l>
+<c>* </c>
+<l>close_framegrabber (AcqHandle)</l>
+<l>dev_update_window ('on')</l>
+<c>* </c>
+</body>
+<docu id="main">
+<parameters/>
+</docu>
+</procedure>
+<procedure name="Go2GenTL_Stamp">
+<interface>
+<io>
+<par name="Stamps" base_type="iconic" dimension="0"/>
+</io>
+<ic>
+<par name="Index" base_type="ctrl" dimension="0"/>
+</ic>
+<oc>
+<par name="Value" base_type="ctrl" dimension="0"/>
+</oc>
+</interface>
+<body>
+<c>* Check if we are on a 64-bit machine</c>
+<l>test_value := 0xFFFFFFFF</l>
+<l>if (test_value &gt; 0)</l>
+<l>    is64bit := 1</l>
+<l>else</l>
+<l>    is64bit := 0</l>
+<l>endif</l>
+<c>* </c>
+<l>get_grayval (Stamps, 0, Index * 4, tempvalue0)</l>
+<l>get_grayval (Stamps, 0, (Index * 4) + 1, tempvalue1)</l>
+<l>get_grayval (Stamps, 0, (Index * 4) + 2, tempvalue2)</l>
+<l>get_grayval (Stamps, 0, (Index * 4) + 3, tempvalue3)</l>
+<c>* </c>
+<c>* The actual stamp from the Gocator is 64-bit. tempvalue0 is the most significant 16-bit (i.e. the top bit is the sign bit)</c>
+<c>* The code below assumes we only need the bottom 32-bit information. User need to update this conversion function if they want to</c>
+<c>* return 64-bit value.</c>
+<c>* </c>
+<l>if (is64bit == 1)</l>
+<l>    tuple_lsh (tempvalue0, 48, tempvalue0)</l>
+<l>    tuple_lsh (tempvalue1, 32, tempvalue1)</l>
+<l>    tuple_lsh (tempvalue2, 16, tempvalue2)</l>
+<l>    tuple_lsh (tempvalue3, 0, tempvalue3)</l>
+<l>    Value := tempvalue0 + tempvalue1 + tempvalue2 + tempvalue3</l>
+<l>else</l>
+<l>    tuple_lsh (tempvalue2, 16, tempvalue2)</l>
+<l>    tuple_lsh (tempvalue3, 0, tempvalue3)</l>
+<l>    Value := tempvalue2 + tempvalue3</l>
+<l>endif</l>
+<l>return ()</l>
+</body>
+<docu id="Go2GenTL_Stamp">
+<parameters>
+<parameter id="Index"/>
+<parameter id="Stamps"/>
+<parameter id="Value"/>
+</parameters>
+</docu>
+</procedure>
+<procedure name="Go2GenTL_ParseData">
+<interface>
+<io>
+<par name="Image" base_type="iconic" dimension="0"/>
+</io>
+<oo>
+<par name="HeightMap" base_type="iconic" dimension="0"/>
+<par name="Intensity" base_type="iconic" dimension="0"/>
+</oo>
+<oc>
+<par name="FrameCount" base_type="ctrl" dimension="0"/>
+<par name="Timestamp" base_type="ctrl" dimension="0"/>
+<par name="EncoderPosition" base_type="ctrl" dimension="0"/>
+<par name="EncoderIndex" base_type="ctrl" dimension="0"/>
+<par name="Inputs" base_type="ctrl" dimension="0"/>
+<par name="xOffset" base_type="ctrl" dimension="0"/>
+<par name="xResolution" base_type="ctrl" dimension="0"/>
+<par name="yOffset" base_type="ctrl" dimension="0"/>
+<par name="yResolution" base_type="ctrl" dimension="0"/>
+<par name="zOffset" base_type="ctrl" dimension="0"/>
+<par name="zResolution" base_type="ctrl" dimension="0"/>
+<par name="Width" base_type="ctrl" dimension="0"/>
+<par name="Length" base_type="ctrl" dimension="0"/>
+<par name="HasIntensity" base_type="ctrl" dimension="0"/>
+</oc>
+</interface>
+<body>
+<l>count_channels (Image, channelCount)</l>
+<c>* </c>
+<l>if (channelCount == 1)</l>
+<c>    * </c>
+<l>    get_image_size (Image, monoImageWidth, monoImageHeight)</l>
+<l>    crop_rectangle1 (Image, Stamps, monoImageHeight - 1, 0, monoImageHeight - 1, monoImageWidth)</l>
+<c>    * </c>
+<l>    Go2GenTL_Stamp (Stamps, 1, FrameCount)</l>
+<l>    Go2GenTL_Stamp (Stamps, 2, Timestamp)</l>
+<l>    Go2GenTL_Stamp (Stamps, 3, EncoderPosition)</l>
+<l>    Go2GenTL_Stamp (Stamps, 4, EncoderIndex)</l>
+<l>    Go2GenTL_Stamp (Stamps, 5, Inputs)</l>
+<l>    Go2GenTL_Stamp (Stamps, 6, xOffset)</l>
+<l>    Go2GenTL_Stamp (Stamps, 7, xResolution)</l>
+<l>    Go2GenTL_Stamp (Stamps, 8, yOffset)</l>
+<l>    Go2GenTL_Stamp (Stamps, 9, yResolution)</l>
+<l>    Go2GenTL_Stamp (Stamps, 10, zOffset)</l>
+<l>    Go2GenTL_Stamp (Stamps, 11, zResolution)</l>
+<l>    Go2GenTL_Stamp (Stamps, 12, Width)</l>
+<l>    Go2GenTL_Stamp (Stamps, 13, Length)</l>
+<l>    Go2GenTL_Stamp (Stamps, 14, HasIntensity)</l>
+<c>    * </c>
+<l>    crop_rectangle1 (Image, HeightMap, 0, 0, Length - 1, Width)</l>
+<l>    if (HasIntensity == 1)</l>
+<l>        IntensityPosition := (monoImageHeight - 1) / 2</l>
+<l>        crop_rectangle1 (Image, Intensity, IntensityPosition, 0, IntensityPosition + Length - 1, Width)</l>
+<l>    else</l>
+<l>        gen_image_const (Intensity, 'byte', Width, Length)</l>
+<l>    endif</l>
+<c>    * </c>
+<l>elseif (channelCount == 3)</l>
+<c>    * </c>
+<l>    decompose3 (Image, HeightMap, Intensity, Stamps)</l>
+<c>    * </c>
+<l>    Go2GenTL_Stamp (Stamps, 1, FrameCount)</l>
+<l>    Go2GenTL_Stamp (Stamps, 2, Timestamp)</l>
+<l>    Go2GenTL_Stamp (Stamps, 3, EncoderPosition)</l>
+<l>    Go2GenTL_Stamp (Stamps, 4, EncoderIndex)</l>
+<l>    Go2GenTL_Stamp (Stamps, 5, Inputs)</l>
+<l>    Go2GenTL_Stamp (Stamps, 6, xOffset)</l>
+<l>    Go2GenTL_Stamp (Stamps, 7, xResolution)</l>
+<l>    Go2GenTL_Stamp (Stamps, 8, yOffset)</l>
+<l>    Go2GenTL_Stamp (Stamps, 9, yResolution)</l>
+<l>    Go2GenTL_Stamp (Stamps, 10, zOffset)</l>
+<l>    Go2GenTL_Stamp (Stamps, 11, zResolution)</l>
+<l>    Go2GenTL_Stamp (Stamps, 12, Width)</l>
+<l>    Go2GenTL_Stamp (Stamps, 13, Length)</l>
+<l>    Go2GenTL_Stamp (Stamps, 14, HasIntensity)</l>
+<l>endif</l>
+<c>* </c>
+<l>return ()</l>
+</body>
+<docu id="Go2GenTL_ParseData">
+<parameters>
+<parameter id="EncoderIndex"/>
+<parameter id="EncoderPosition"/>
+<parameter id="FrameCount"/>
+<parameter id="HasIntensity"/>
+<parameter id="HeightMap"/>
+<parameter id="Image"/>
+<parameter id="Inputs"/>
+<parameter id="Intensity"/>
+<parameter id="Length"/>
+<parameter id="Timestamp"/>
+<parameter id="Width"/>
+<parameter id="xOffset"/>
+<parameter id="xResolution"/>
+<parameter id="yOffset"/>
+<parameter id="yResolution"/>
+<parameter id="zOffset"/>
+<parameter id="zResolution"/>
+</parameters>
+</docu>
+</procedure>
+<procedure name="Go2GenTL_SetConfigFileName">
+<interface>
+<ic>
+<par name="AcqHandle" base_type="ctrl" dimension="0"/>
+<par name="ConfigFileName" base_type="ctrl" dimension="0"/>
+</ic>
+</interface>
+<body>
+<l>set_framegrabber_param (AcqHandle, 'ConfigFile', ConfigFileName)</l>
+<l>return ()</l>
+</body>
+<docu id="Go2GenTL_SetConfigFileName">
+<parameters>
+<parameter id="AcqHandle"/>
+<parameter id="ConfigFileName">
+<default_type>string</default_type>
+<sem_type>string</sem_type>
+<type_list>
+<item>string</item>
+</type_list>
+</parameter>
+</parameters>
+</docu>
+</procedure>
+<procedure name="Go2GenTL_Transformation">
+<interface>
+<ic>
+<par name="AcqHandle" base_type="ctrl" dimension="0"/>
+</ic>
+<oc>
+<par name="XOffset" base_type="ctrl" dimension="0"/>
+<par name="ZOffset" base_type="ctrl" dimension="0"/>
+<par name="Angle" base_type="ctrl" dimension="0"/>
+<par name="Orientation" base_type="ctrl" dimension="0"/>
+<par name="StandOff" base_type="ctrl" dimension="0"/>
+</oc>
+</interface>
+<body>
+<l>get_framegrabber_param (AcqHandle, 'TransformationXOffset', XOffset)</l>
+<l>get_framegrabber_param (AcqHandle, 'TransformationZOffset', ZOffset)</l>
+<l>get_framegrabber_param (AcqHandle, 'TransformationAngle', Angle)</l>
+<l>get_framegrabber_param (AcqHandle, 'TransformationOrientation', Orientation)</l>
+<l>get_framegrabber_param (AcqHandle, 'Standoff', StandOff)</l>
+<l>return ()</l>
+</body>
+<docu id="Go2GenTL_Transformation">
+<parameters>
+<parameter id="AcqHandle"/>
+<parameter id="Angle"/>
+<parameter id="Orientation"/>
+<parameter id="StandOff"/>
+<parameter id="XOffset"/>
+<parameter id="ZOffset"/>
+</parameters>
+</docu>
+</procedure>
+<procedure name="display_waiting_message">
+<interface/>
+<body>
+<l>dev_close_window ()</l>
+<l>dev_open_window (0, 0, 800, 100, 'white', WindowID1)</l>
+<l>set_display_font (WindowID1, 16, 'mono', 'true', 'false')</l>
+<l>disp_message (WindowID1, 'Waiting for external trigger... Press GoLink TRIGGER.', 'window', 40, 100, 'red', 'false')</l>
+<l>return ()</l>
+</body>
+<docu id="display_waiting_message">
+<parameters/>
+</docu>
+</procedure>
+</hdevelop>
